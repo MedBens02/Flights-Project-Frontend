@@ -3,8 +3,8 @@ import { Flight } from '@/types/flight'
 import { SearchCriteria } from '@/types/search'
 import { MOCK_AIRPORTS, generateMockFlights } from './mockData'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:7001/api'
-const USE_MOCK_DATA = true  // Toggle this when backend is ready
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7001/api'
+const USE_MOCK_DATA = false  // Backend is now ready!
 
 /**
  * Search airports by keyword (name, city, IATA code)
@@ -44,8 +44,8 @@ export async function searchFlights(criteria: SearchCriteria): Promise<Flight[]>
     body: JSON.stringify({
       originLocationCode: criteria.origin?.iataCode,
       destinationLocationCode: criteria.destination?.iataCode,
-      departureDate: criteria.departureDate,
-      returnDate: criteria.returnDate,
+      departureDate: criteria.departureDate + 'T00:00:00Z',
+      returnDate: criteria.returnDate ? criteria.returnDate + 'T00:00:00Z' : null,
       adults: criteria.passengers,  // Will need to adjust when using guide's passenger object
       travelClass: criteria.travelClass.toUpperCase(),
     }),
