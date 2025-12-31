@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Modern travel aesthetic with blues and teals - Converted from OKLCH to Hex for Tailwind v3 */
+  --background: 250 250 250;  /* #fafafa */
+  --foreground: 38 38 38;     /* #262626 */
+  --card: 255 255 255;        /* #ffffff */
+  --card-foreground: 38 38 38;
+  --popover: 255 255 255;
+  --popover-foreground: 38 38 38;
+  --primary: 67 56 202;       /* #4338ca - purple-700 */
+  --primary-foreground: 250 250 250;
+  --secondary: 59 130 246;    /* #3b82f6 - blue-500 */
+  --secondary-foreground: 250 250 250;
+  --accent: 6 182 212;        /* #06b6d4 - cyan-500 */
+  --accent-foreground: 250 250 250;
+  --muted: 229 229 229;       /* #e5e5e5 */
+  --muted-foreground: 115 115 115;
+  --destructive: 220 38 38;   /* #dc2626 - red-600 */
+  --destructive-foreground: 250 250 250;
+  --border: 229 231 235;      /* #e5e7eb */
+  --input: 243 244 246;       /* #f3f4f6 */
+  --ring: 67 56 202;          /* #4338ca */
+  --chart-1: 67 56 202;
+  --chart-2: 6 182 212;
+  --chart-3: 99 102 241;      /* #6366f1 - indigo-500 */
+  --chart-4: 234 179 8;       /* #eab308 - yellow-500 */
+  --chart-5: 34 197 94;       /* #22c55e - green-500 */
+  --radius: 1.25rem;
+  --sidebar: 250 250 250;
+  --sidebar-foreground: 38 38 38;
+  --sidebar-primary: 67 56 202;
+  --sidebar-primary-foreground: 250 250 250;
+  --sidebar-accent: 229 229 229;
+  --sidebar-accent-foreground: 51 51 51;
+  --sidebar-border: 229 231 235;
+  --sidebar-ring: 67 56 202;
+}
+
+.dark {
+  --background: 20 20 20;     /* #141414 */
+  --foreground: 245 245 245;  /* #f5f5f5 */
+  --card: 31 31 31;           /* #1f1f1f */
+  --card-foreground: 245 245 245;
+  --popover: 31 31 31;
+  --popover-foreground: 245 245 245;
+  --primary: 59 130 246;      /* #3b82f6 - blue-500 */
+  --primary-foreground: 20 20 20;
+  --secondary: 6 182 212;     /* #06b6d4 - cyan-500 */
+  --secondary-foreground: 20 20 20;
+  --accent: 20 184 166;       /* #14b8a6 - teal-500 */
+  --accent-foreground: 20 20 20;
+  --muted: 64 64 64;          /* #404040 */
+  --muted-foreground: 163 163 163;
+  --destructive: 185 28 28;   /* #b91c1c - red-700 */
+  --destructive-foreground: 245 245 245;
+  --border: 51 51 51;         /* #333333 */
+  --input: 38 38 38;          /* #262626 */
+  --ring: 59 130 246;
+  --chart-1: 59 130 246;
+  --chart-2: 6 182 212;
+  --chart-3: 99 102 241;
+  --chart-4: 234 179 8;
+  --chart-5: 34 197 94;
+  --sidebar: 26 26 26;
+  --sidebar-foreground: 245 245 245;
+  --sidebar-primary: 59 130 246;
+  --sidebar-primary-foreground: 20 20 20;
+  --sidebar-accent: 51 51 51;
+  --sidebar-accent-foreground: 229 229 229;
+  --sidebar-border: 51 51 51;
+  --sidebar-ring: 59 130 246;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-gradient-radial {
+    background-image: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+}
+
+/* Add wavy background animations */
+@keyframes wave {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.wave-animation {
+  animation: wave 6s ease-in-out infinite;
+}
+
+.float-animation {
+  animation: float 8s ease-in-out infinite;
+}
+
+.bg-gradient-creative {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
