@@ -8,6 +8,7 @@ import type { Flight, SearchParams } from "@/app/page"
 
 interface ResultsViewProps {
   flights: Flight[]
+  rawOffers: Record<string, any>
   searchParams: SearchParams
   onModifySearch: (params: SearchParams) => void
 }
@@ -15,7 +16,7 @@ interface ResultsViewProps {
 type SortOption = "price-asc" | "price-desc" | "duration-asc" | "duration-desc" | "departure-asc"
 type FilterStop = "all" | "direct" | "oneStop" | "any"
 
-export default function ResultsView({ flights, searchParams, onModifySearch }: ResultsViewProps) {
+export default function ResultsView({ flights, rawOffers, searchParams, onModifySearch }: ResultsViewProps) {
   const [sortBy, setSortBy] = useState<SortOption>("price-asc")
   const [filterStops, setFilterStops] = useState<FilterStop>("all")
   const [departureTimeFilter, setDepartureTimeFilter] = useState("all")
@@ -203,6 +204,7 @@ export default function ResultsView({ flights, searchParams, onModifySearch }: R
       {selectedFlight && (
         <FlightDetailsModal
           flight={selectedFlight}
+          rawOffer={rawOffers[selectedFlight.id]}
           searchParams={searchParams}
           onClose={() => setSelectedFlight(null)}
           onConfirm={(bookingData) => {

@@ -19,7 +19,11 @@ export interface SearchParams {
 
 function HomeContent() {
   const [searchParams, setSearchParams] = useState<SearchParams | null>(null)
-  const { mutate: searchFlights, data: flights, isPending } = useFlightSearch()
+  const { mutate: searchFlights, data, isPending } = useFlightSearch()
+
+  // Extract flights and rawOffers from the response
+  const flights = data?.flights || []
+  const rawOffers = data?.rawOffers || {}
 
   const handleSearch = (params: SearchParams) => {
     setSearchParams(params)
@@ -60,7 +64,12 @@ function HomeContent() {
         </div>
       )}
       {flights && flights.length > 0 && !isPending && (
-        <ResultsView flights={flights} searchParams={searchParams!} onModifySearch={handleSearch} />
+        <ResultsView
+          flights={flights}
+          rawOffers={rawOffers}
+          searchParams={searchParams!}
+          onModifySearch={handleSearch}
+        />
       )}
     </div>
   )

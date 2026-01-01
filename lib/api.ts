@@ -30,14 +30,20 @@ export async function searchAirports(keyword: string): Promise<Airport[]> {
 /**
  * Search flights based on criteria
  * Backend endpoint: POST /api/flights/search
+ * Returns both mapped flights and raw Amadeus offers (needed for SeatMap API)
  */
-export async function searchFlights(criteria: SearchCriteria): Promise<Flight[]> {
+export async function searchFlights(criteria: SearchCriteria): Promise<{
+  flights: Flight[]
+  rawOffers: Record<string, any>
+}> {
   if (USE_MOCK_DATA) {
     await new Promise(resolve => setTimeout(resolve, 800)) // Simulate network delay
-    return generateMockFlights(criteria)
+    const flights = generateMockFlights(criteria)
+    // Mock data doesn't have raw offers
+    return { flights, rawOffers: {} }
   }
 
-  // Real backend call (for when backend is ready)
+  // Real backend call
   const res = await fetch(`${API_BASE_URL}/flights/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -51,5 +57,7 @@ export async function searchFlights(criteria: SearchCriteria): Promise<Flight[]>
     }),
   })
   if (!res.ok) throw new Error('Failed to search flights')
+
+  // Backend now returns { flights: Flight[], rawOffers: Record<string, any> }
   return res.json()
 }

@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import type { Flight } from "@/types/flight"
 import { X, Luggage, Users, AlertCircle } from "lucide-react"
 
 interface FlightDetailsModalProps {
   flight: Flight
+  rawOffer?: any  // Raw Amadeus flight offer (needed for SeatMap API)
   searchParams: any
   onClose: () => void
   onConfirm: (bookingData: any) => void
@@ -72,7 +73,7 @@ const LUGGAGE_OPTIONS = [
   { id: "cabin", label: "Cabin Baggage", weight: "7kg", price: 0, included: true },
 ]
 
-export default function FlightDetailsModal({ flight, searchParams, onClose, onConfirm }: FlightDetailsModalProps) {
+export default function FlightDetailsModal({ flight, rawOffer, searchParams, onClose, onConfirm }: FlightDetailsModalProps) {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [selectedLuggage, setSelectedLuggage] = useState<string[]>(["standard", "cabin"])
   const [activeTab, setActiveTab] = useState<"seats" | "luggage" | "review">("seats")
@@ -82,26 +83,44 @@ export default function FlightDetailsModal({ flight, searchParams, onClose, onCo
   const lastSegment = flight.itineraries[0]?.segments[flight.itineraries[0]?.segments.length - 1]
   const airline = flight.airlines[0] || flight.validatingAirline
 
-  const generateSeats = () => {
-    const seats = []
-    const totalPassengers = searchParams.passengers || 1
+  // Deterministic pseudo-random function using flight ID as seed
+  const seededRandom = (seed: string, index: number): number => {
+    const hash = seed.split('').reduce((acc, char) => {
+      return ((acc << 5) - acc) + char.charCodeAt(0);
+    }, 0);
+    const combined = (hash + index) * 2654435761;
+    return (combined % 100) / 100;
+  };
+
+  // Generate seats with useMemo - only regenerates when flight changes
+  const seats = useMemo(() => {
+    const result = []
     const seatsConfig = SEAT_CLASSES[searchParams.className || "economy"]
+    const totalSeats = seatsConfig.rows * seatsConfig.seatsPerRow
+    const availableSeats = flight.seats  // From Amadeus API
+
+    // Calculate how many seats should be booked
+    const bookedSeatsCount = Math.max(0, totalSeats - availableSeats)
+    const bookedProbability = bookedSeatsCount / totalSeats
 
     for (let row = 1; row <= seatsConfig.rows; row++) {
       for (let col = 0; col < seatsConfig.seatsPerRow; col++) {
         const seatId = `${String.fromCharCode(65 + col)}${row}`
-        const isBooked = Math.random() > 0.7 // 30% booked seats
-        seats.push({
+        const seatIndex = (row - 1) * seatsConfig.seatsPerRow + col
+
+        // Use flight ID as seed for deterministic "random" booking
+        const randomValue = seededRandom(flight.id, seatIndex)
+        const isBooked = randomValue < bookedProbability
+
+        result.push({
           id: seatId,
           isBooked,
-          isSelected: selectedSeats.includes(seatId),
+          isSelected: false  // Don't include selectedSeats in initial generation
         })
       }
     }
-    return seats
-  }
-
-  const seats = generateSeats()
+    return result
+  }, [flight.id, searchParams.className, flight.seats])
   const maxSeatsSelectable = searchParams.passengers || 1
   const totalLuggagePrice = selectedLuggage
     .filter((id) => id !== "standard" && id !== "cabin")
@@ -238,6 +257,7 @@ export default function FlightDetailsModal({ flight, searchParams, onClose, onCo
                               const seatNum = String.fromCharCode(65 + colIdx)
                               const seatId = `${seatNum}${rowIdx + 1}`
                               const seat = seats.find((s) => s.id === seatId)
+                              const isSelected = selectedSeats.includes(seatId)
                               return (
                                 <button
                                   key={seatId}
@@ -246,7 +266,7 @@ export default function FlightDetailsModal({ flight, searchParams, onClose, onCo
                                   className={`w-10 h-10 rounded-lg font-bold text-xs transition-all duration-200 ${
                                     seat?.isBooked
                                       ? "bg-gray-300 cursor-not-allowed text-gray-500"
-                                      : seat?.isSelected
+                                      : isSelected
                                         ? "bg-gradient-to-br from-primary to-accent text-white scale-110 shadow-lg"
                                         : "bg-white border-2 border-primary/20 text-foreground hover:border-primary hover:bg-blue-50"
                                   }`}
