@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import type { Flight } from "@/app/page"
+import type { Flight } from "@/types/flight"
 import { X, Luggage, Users, AlertCircle } from "lucide-react"
 
 interface FlightDetailsModalProps {
@@ -10,6 +10,53 @@ interface FlightDetailsModalProps {
   searchParams: any
   onClose: () => void
   onConfirm: (bookingData: any) => void
+}
+
+// Helper functions to extract data from new Flight structure
+function formatTime(isoDateTime: string): string {
+  if (!isoDateTime) return ""
+  try {
+    const date = new Date(isoDateTime)
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  } catch {
+    return isoDateTime
+  }
+}
+
+function formatDate(isoDateTime: string): string {
+  if (!isoDateTime) return ""
+  try {
+    const date = new Date(isoDateTime)
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return isoDateTime
+  }
+}
+
+function formatDuration(isoDuration: string): string {
+  if (!isoDuration || !isoDuration.startsWith('PT')) return isoDuration
+
+  try {
+    const duration = isoDuration.substring(2)
+    let result = ""
+
+    const hIndex = duration.indexOf('H')
+    if (hIndex > 0) {
+      const hours = duration.substring(0, hIndex)
+      result += `${hours}h `
+    }
+
+    const mIndex = duration.indexOf('M')
+    if (mIndex > 0) {
+      const startIndex = hIndex > 0 ? hIndex + 1 : 0
+      const minutes = duration.substring(startIndex, mIndex)
+      result += `${minutes}m`
+    }
+
+    return result.trim()
+  } catch {
+    return isoDuration
+  }
 }
 
 const SEAT_CLASSES = {
@@ -29,6 +76,11 @@ export default function FlightDetailsModal({ flight, searchParams, onClose, onCo
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [selectedLuggage, setSelectedLuggage] = useState<string[]>(["standard", "cabin"])
   const [activeTab, setActiveTab] = useState<"seats" | "luggage" | "review">("seats")
+
+  // Extract first and last segments from itinerary
+  const firstSegment = flight.itineraries[0]?.segments[0]
+  const lastSegment = flight.itineraries[0]?.segments[flight.itineraries[0]?.segments.length - 1]
+  const airline = flight.airlines[0] || flight.validatingAirline
 
   const generateSeats = () => {
     const seats = []
@@ -91,7 +143,7 @@ export default function FlightDetailsModal({ flight, searchParams, onClose, onCo
         <div className="bg-gradient-to-r from-primary via-accent to-purple-500 p-6 text-white sticky top-0 z-10">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-2xl font-bold">{flight.airline}</h2>
+              <h2 className="text-2xl font-bold">{airline}</h2>
               <p className="text-white/90 text-sm">Flight {flight.id}</p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
@@ -103,18 +155,18 @@ export default function FlightDetailsModal({ flight, searchParams, onClose, onCo
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <p className="text-white/80 mb-1">Departure</p>
-              <p className="font-bold text-lg">{flight.departure.time}</p>
-              <p className="text-white/90">{flight.departure.city}</p>
+              <p className="font-bold text-lg">{formatTime(firstSegment?.departureTime)}</p>
+              <p className="text-white/90">{firstSegment?.departureCity}</p>
             </div>
             <div className="text-center">
               <p className="text-white/80 mb-1">Duration</p>
-              <p className="font-bold">{flight.duration}</p>
-              <p className="text-white/90">{flight.stops === 0 ? "Direct" : `${flight.stops} stop`}</p>
+              <p className="font-bold">{formatDuration(flight.totalDuration)}</p>
+              <p className="text-white/90">{flight.totalStops === 0 ? "Direct" : `${flight.totalStops} stop`}</p>
             </div>
             <div className="text-right">
               <p className="text-white/80 mb-1">Arrival</p>
-              <p className="font-bold text-lg">{flight.arrival.time}</p>
-              <p className="text-white/90">{flight.arrival.city}</p>
+              <p className="font-bold text-lg">{formatTime(lastSegment?.arrivalTime)}</p>
+              <p className="text-white/90">{lastSegment?.arrivalCity}</p>
             </div>
           </div>
         </div>
@@ -286,10 +338,10 @@ export default function FlightDetailsModal({ flight, searchParams, onClose, onCo
                 <div>
                   <p className="text-sm text-foreground/60 mb-1">Flight Details</p>
                   <p className="font-bold text-foreground">
-                    {flight.departure.city} → {flight.arrival.city}
+                    {firstSegment?.departureCity} → {lastSegment?.arrivalCity}
                   </p>
                   <p className="text-sm text-foreground/60">
-                    {flight.departure.date} | {flight.departure.time} - {flight.arrival.time}
+                    {formatDate(firstSegment?.departureTime)} | {formatTime(firstSegment?.departureTime)} - {formatTime(lastSegment?.arrivalTime)}
                   </p>
                 </div>
 

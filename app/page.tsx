@@ -5,6 +5,7 @@ import SearchForm from "@/components/search-form"
 import ResultsView from "@/components/results-view"
 import HeroPage from "@/components/hero-page"
 import { useFlightSearch } from "@/hooks/useFlightSearch"
+import type { Flight } from "@/types/flight"
 
 export interface SearchParams {
   tripType: "roundtrip" | "oneway"
@@ -14,26 +15,6 @@ export interface SearchParams {
   returnDate: string
   passengers: number
   className: "economy" | "business" | "first"
-}
-
-export interface Flight {
-  id: string
-  airline: string
-  departure: {
-    city: string
-    time: string
-    date: string
-  }
-  arrival: {
-    city: string
-    time: string
-    date: string
-  }
-  duration: string
-  stops: number
-  price: number
-  currency: string
-  seats: number
 }
 
 function HomeContent() {
