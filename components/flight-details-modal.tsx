@@ -79,8 +79,18 @@ export default function FlightDetailsModal({ flight, rawOffer, searchParams, onC
   const [activeTab, setActiveTab] = useState<"seats" | "luggage" | "review">("seats")
 
   // Extract first and last segments from itinerary
-  const firstSegment = flight.itineraries[0]?.segments[0]
-  const lastSegment = flight.itineraries[0]?.segments[flight.itineraries[0]?.segments.length - 1]
+  const isRoundTrip = flight.itineraries.length > 1
+
+  // Outbound flight
+  const outbound = flight.itineraries[0]
+  const firstSegment = outbound?.segments[0]
+  const lastSegment = outbound?.segments[outbound?.segments.length - 1]
+
+  // Return flight (if exists)
+  const returnFlight = flight.itineraries[1]
+  const returnFirstSegment = returnFlight?.segments[0]
+  const returnLastSegment = returnFlight?.segments[returnFlight?.segments.length - 1]
+
   const airline = flight.airlines[0] || flight.validatingAirline
 
   // Deterministic pseudo-random function using flight ID as seed
@@ -171,23 +181,74 @@ export default function FlightDetailsModal({ flight, rawOffer, searchParams, onC
           </div>
 
           {/* Flight Summary */}
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-white/80 mb-1">Departure</p>
-              <p className="font-bold text-lg">{formatTime(firstSegment?.departureTime)}</p>
-              <p className="text-white/90">{firstSegment?.departureCity}</p>
+          {!isRoundTrip ? (
+            // One-way flight display
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-white/80 mb-1">Departure</p>
+                <p className="font-bold text-lg">{formatTime(firstSegment?.departureTime)}</p>
+                <p className="text-white/90">{firstSegment?.departureCity}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-white/80 mb-1">Duration</p>
+                <p className="font-bold">{formatDuration(flight.totalDuration)}</p>
+                <p className="text-white/90">{flight.totalStops === 0 ? "Direct" : `${flight.totalStops} stop`}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-white/80 mb-1">Arrival</p>
+                <p className="font-bold text-lg">{formatTime(lastSegment?.arrivalTime)}</p>
+                <p className="text-white/90">{lastSegment?.arrivalCity}</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-white/80 mb-1">Duration</p>
-              <p className="font-bold">{formatDuration(flight.totalDuration)}</p>
-              <p className="text-white/90">{flight.totalStops === 0 ? "Direct" : `${flight.totalStops} stop`}</p>
+          ) : (
+            // Round-trip flight display
+            <div className="space-y-4">
+              {/* Outbound */}
+              <div>
+                <p className="text-white/90 font-semibold text-xs mb-2 uppercase tracking-wide">Outbound</p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-white/70 mb-1 text-xs">Departure</p>
+                    <p className="font-bold">{formatTime(firstSegment?.departureTime)}</p>
+                    <p className="text-white/90 text-xs">{firstSegment?.departureCity}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-white/70 mb-1 text-xs">Duration</p>
+                    <p className="font-bold">{formatDuration(outbound?.duration)}</p>
+                    <p className="text-white/90 text-xs">{outbound?.numberOfStops === 0 ? "Direct" : `${outbound?.numberOfStops} stop`}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white/70 mb-1 text-xs">Arrival</p>
+                    <p className="font-bold">{formatTime(lastSegment?.arrivalTime)}</p>
+                    <p className="text-white/90 text-xs">{lastSegment?.arrivalCity}</p>
+                  </div>
+                </div>
+              </div>
+              {/* Return */}
+              {returnFlight && (
+                <div className="pt-3 border-t border-white/20">
+                  <p className="text-white/90 font-semibold text-xs mb-2 uppercase tracking-wide">Return</p>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-white/70 mb-1 text-xs">Departure</p>
+                      <p className="font-bold">{formatTime(returnFirstSegment?.departureTime)}</p>
+                      <p className="text-white/90 text-xs">{returnFirstSegment?.departureCity}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-white/70 mb-1 text-xs">Duration</p>
+                      <p className="font-bold">{formatDuration(returnFlight?.duration)}</p>
+                      <p className="text-white/90 text-xs">{returnFlight?.numberOfStops === 0 ? "Direct" : `${returnFlight?.numberOfStops} stop`}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white/70 mb-1 text-xs">Arrival</p>
+                      <p className="font-bold">{formatTime(returnLastSegment?.arrivalTime)}</p>
+                      <p className="text-white/90 text-xs">{returnLastSegment?.arrivalCity}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="text-right">
-              <p className="text-white/80 mb-1">Arrival</p>
-              <p className="font-bold text-lg">{formatTime(lastSegment?.arrivalTime)}</p>
-              <p className="text-white/90">{lastSegment?.arrivalCity}</p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -472,15 +533,22 @@ export default function FlightDetailsModal({ flight, rawOffer, searchParams, onC
             <Button
               onClick={() => {
                 const bookingRef = `BK${Date.now().toString().slice(-8).toUpperCase()}`
-                const params = new URLSearchParams({
-                  flightId: flight.id,
-                  seats: selectedSeats.join(","),
-                  luggage: selectedLuggage.join(","),
-                  totalPrice: totalPrice.toString(),
-                  passengers: (searchParams.passengers || 1).toString(),
+
+                // Store complete booking data in sessionStorage
+                const bookingData = {
+                  bookingReference: bookingRef,
+                  bookingDate: new Date().toISOString(),
+                  flight: flight,
+                  selectedSeats: selectedSeats,
+                  selectedLuggage: selectedLuggage,
+                  totalPrice: totalPrice,
+                  passengers: searchParams.passengers || 1,
                   className: searchParams.className || "economy",
-                })
-                window.location.href = `/thank-you?${params.toString()}`
+                  searchParams: searchParams
+                }
+
+                sessionStorage.setItem('flightBooking', JSON.stringify(bookingData))
+                window.location.href = `/thank-you?ref=${bookingRef}`
               }}
               disabled={!isSeatsComplete}
               className="bg-accent hover:bg-accent/90 text-white font-bold"

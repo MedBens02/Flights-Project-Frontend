@@ -1,7 +1,7 @@
 import { Airport } from './airport'
 
 export type TripType = 'oneway' | 'roundtrip'  // Match current app
-export type TravelClass = 'economy' | 'business' | 'first'  // Match current app
+export type TravelClass = 'economy' | 'premium_economy' | 'business' | 'first'
 
 export interface SearchCriteria {
   tripType: TripType

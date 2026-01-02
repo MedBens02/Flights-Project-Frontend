@@ -62,44 +62,100 @@ export function generateMockFlights(criteria: SearchCriteria): Flight[] {
     // Generate random departure times
     const depHour = 6 + Math.floor(Math.random() * 16) // 6:00 - 22:00
     const depMin = Math.floor(Math.random() * 4) * 15 // 00, 15, 30, 45
-    const departureTime = `${String(depHour).padStart(2, '0')}:${String(depMin).padStart(2, '0')}`
 
     // Generate duration (2-8 hours)
     const durationHours = 2 + Math.floor(Math.random() * 6)
     const durationMins = Math.floor(Math.random() * 4) * 15
-    const duration = `${durationHours}h ${durationMins}m`
 
-    // Calculate arrival time
-    const arrHour = (depHour + durationHours + Math.floor((depMin + durationMins) / 60)) % 24
-    const arrMin = (depMin + durationMins) % 60
-    const arrivalTime = `${String(arrHour).padStart(2, '0')}:${String(arrMin).padStart(2, '0')}`
+    // Calculate prices for ALL cabins
+    let economyPrice = 150 + Math.floor(Math.random() * 400)
+    if (stops === 0) economyPrice += 50
 
-    // Base price calculation
-    let basePrice = 150 + Math.floor(Math.random() * 400)
-    if (criteria.travelClass === 'business') basePrice *= 2.5
-    if (criteria.travelClass === 'first') basePrice *= 4
-    if (stops === 0) basePrice += 50
+    const cabinPrices = {
+      economy: Math.round(economyPrice),
+      business: Math.round(economyPrice * 2.5),
+      first: Math.round(economyPrice * 4)
+    }
 
-    const price = Math.round(basePrice)
+    // Use the selected class price as the main price
+    const selectedClassPrice = cabinPrices[criteria.travelClass as 'economy' | 'business' | 'first'] || cabinPrices.economy
+
+    // Create ISO datetime for departure
+    const departureDateTime = `${criteria.departureDate}T${String(depHour).padStart(2, '0')}:${String(depMin).padStart(2, '0')}:00`
+
+    // Calculate arrival datetime
+    const depDate = new Date(departureDateTime)
+    depDate.setHours(depDate.getHours() + durationHours)
+    depDate.setMinutes(depDate.getMinutes() + durationMins)
+    const arrivalDateTime = depDate.toISOString().slice(0, 19)
+
+    // ISO duration format
+    const isoDuration = `PT${durationHours}H${durationMins}M`
+
+    // Create outbound itinerary
+    const outboundSegments = [{
+      departureAirport: criteria.origin.iataCode,
+      departureCity: criteria.origin.cityName,
+      arrivalAirport: criteria.destination.iataCode,
+      arrivalCity: criteria.destination.cityName,
+      departureTime: departureDateTime,
+      arrivalTime: arrivalDateTime,
+      flightNumber: `${Math.floor(Math.random() * 9000) + 1000}`,
+      airlineCode: airline.substring(0, 2).toUpperCase(),
+      airlineName: airline,
+      duration: isoDuration,
+      sequenceNumber: 0,
+      aircraftCode: ['320', '321', '737', '738', '777', '787'][Math.floor(Math.random() * 6)]
+    }]
+
+    const itineraries = [{
+      duration: isoDuration,
+      segments: outboundSegments,
+      numberOfStops: stops
+    }]
+
+    // Add return itinerary for round-trips
+    if (criteria.tripType === 'roundtrip' && criteria.returnDate) {
+      const returnDepHour = 6 + Math.floor(Math.random() * 16)
+      const returnDepMin = Math.floor(Math.random() * 4) * 15
+      const returnDepartureDateTime = `${criteria.returnDate}T${String(returnDepHour).padStart(2, '0')}:${String(returnDepMin).padStart(2, '0')}:00`
+
+      const returnDepDate = new Date(returnDepartureDateTime)
+      returnDepDate.setHours(returnDepDate.getHours() + durationHours)
+      returnDepDate.setMinutes(returnDepDate.getMinutes() + durationMins)
+      const returnArrivalDateTime = returnDepDate.toISOString().slice(0, 19)
+
+      itineraries.push({
+        duration: isoDuration,
+        segments: [{
+          departureAirport: criteria.destination.iataCode,
+          departureCity: criteria.destination.cityName,
+          arrivalAirport: criteria.origin.iataCode,
+          arrivalCity: criteria.origin.cityName,
+          departureTime: returnDepartureDateTime,
+          arrivalTime: returnArrivalDateTime,
+          flightNumber: `${Math.floor(Math.random() * 9000) + 1000}`,
+          airlineCode: airline.substring(0, 2).toUpperCase(),
+          airlineName: airline,
+          duration: isoDuration,
+          sequenceNumber: 0,
+          aircraftCode: ['320', '321', '737', '738', '777', '787'][Math.floor(Math.random() * 6)]
+        }],
+        numberOfStops: stops
+      })
+    }
 
     flights.push({
       id: `FL${1000 + i}`,
-      airline,
-      departure: {
-        city: criteria.origin.iataCode,
-        time: departureTime,
-        date: criteria.departureDate,
-      },
-      arrival: {
-        city: criteria.destination.iataCode,
-        time: arrivalTime,
-        date: criteria.departureDate,
-      },
-      duration,
-      stops,
-      price,
+      price: selectedClassPrice,
       currency: 'EUR',
       seats: Math.floor(Math.random() * 20) + 3,
+      itineraries,
+      airlines: [airline],
+      validatingAirline: airline,
+      totalDuration: isoDuration,
+      totalStops: stops,
+      cabinPrices
     })
   }
 

@@ -6,77 +6,109 @@ import { Button } from "@/components/ui/button"
 import BookingTicket from "@/components/booking-ticket"
 import { Check, Users } from "lucide-react"
 
+import type { Flight } from "@/types/flight"
+
+// Helper functions for formatting
+function formatTime(isoDateTime: string): string {
+  if (!isoDateTime) return ""
+  try {
+    const date = new Date(isoDateTime)
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  } catch {
+    return isoDateTime
+  }
+}
+
+function formatDate(isoDateTime: string): string {
+  if (!isoDateTime) return ""
+  try {
+    const date = new Date(isoDateTime)
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return isoDateTime
+  }
+}
+
+function formatDuration(isoDuration: string): string {
+  if (!isoDuration || !isoDuration.startsWith('PT')) return isoDuration
+
+  try {
+    const duration = isoDuration.substring(2) // Remove "PT"
+    let result = ""
+
+    const hIndex = duration.indexOf('H')
+    if (hIndex > 0) {
+      const hours = duration.substring(0, hIndex)
+      result += `${hours}h `
+    }
+
+    const mIndex = duration.indexOf('M')
+    if (mIndex > 0) {
+      const startIndex = hIndex > 0 ? hIndex + 1 : 0
+      const minutes = duration.substring(startIndex, mIndex)
+      result += `${minutes}m`
+    }
+
+    return result.trim()
+  } catch {
+    return isoDuration
+  }
+}
+
 interface BookingData {
-  flightId: string
+  bookingReference: string
+  bookingDate: string
+  flight: Flight
   selectedSeats: string[]
   selectedLuggage: string[]
   totalPrice: number
-  bookingRef: string
-}
-
-interface FlightData {
-  id: string
-  airline: string
-  departure: { city: string; time: string; date: string }
-  arrival: { city: string; time: string; date: string }
-  duration: string
-  stops: number
-  price: number
+  passengers: number
+  className: string
+  searchParams: any
 }
 
 function ThankYouContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const [bookingData, setBookingData] = useState<BookingData | null>(null)
-  const [flightData, setFlightData] = useState<FlightData | null>(null)
-  const [searchParams_data, setSearchParamsData] = useState<any>(null)
+  const [booking, setBooking] = useState<BookingData | null>(null)
 
   useEffect(() => {
-    // Parse booking data from URL
-    const flightId = searchParams.get("flightId")
-    const seats = searchParams.get("seats")
-    const luggage = searchParams.get("luggage")
-    const totalPrice = searchParams.get("totalPrice")
+    // Read booking data from sessionStorage
+    const stored = sessionStorage.getItem('flightBooking')
 
-    if (!flightId || !seats || !luggage || !totalPrice) {
+    if (!stored) {
+      // No booking data found, redirect to home
       router.push("/")
       return
     }
 
-    // Generate booking reference
-    const bookingRef = `BK${Date.now().toString().slice(-8).toUpperCase()}`
-
-    const bookingInfo: BookingData = {
-      flightId,
-      selectedSeats: seats.split(","),
-      selectedLuggage: luggage.split(","),
-      totalPrice: Number.parseInt(totalPrice),
-      bookingRef,
+    try {
+      const bookingData = JSON.parse(stored)
+      setBooking(bookingData)
+      // Clear sessionStorage after reading to prevent reuse
+      sessionStorage.removeItem('flightBooking')
+    } catch (error) {
+      console.error("Failed to parse booking data:", error)
+      router.push("/")
     }
+  }, [router])
 
-    setBookingData(bookingInfo)
-
-    // Mock flight data - in real app, fetch from API
-    const mockFlight: FlightData = {
-      id: flightId,
-      airline: "Air France",
-      departure: { city: "CDG", time: "08:00", date: new Date().toISOString().split("T")[0] },
-      arrival: { city: "LHR", time: "12:30", date: new Date().toISOString().split("T")[0] },
-      duration: "2h 30m",
-      stops: 0,
-      price: 245,
-    }
-
-    setFlightData(mockFlight)
-    setSearchParamsData({
-      passengers: Number.parseInt(searchParams.get("passengers") || "1"),
-      className: searchParams.get("className") || "economy",
-    })
-  }, [searchParams, router])
-
-  if (!bookingData || !flightData) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  if (!booking) {
+    return <div className="min-h-screen flex items-center justify-center">Loading booking details...</div>
   }
+
+  // Extract flight data
+  const flight = booking.flight
+  const isRoundTrip = flight.itineraries.length > 1
+
+  // Outbound flight
+  const outbound = flight.itineraries[0]
+  const outboundFirst = outbound?.segments[0]
+  const outboundLast = outbound?.segments[outbound?.segments.length - 1]
+
+  // Return flight (if exists)
+  const returnFlight = flight.itineraries[1]
+  const returnFirst = returnFlight?.segments[0]
+  const returnLast = returnFlight?.segments[returnFlight?.segments.length - 1]
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-blue-50/20">
@@ -103,11 +135,11 @@ function ThankYouContent() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <p className="text-foreground/60 text-sm mb-1">Booking Reference</p>
-                  <p className="text-3xl font-bold text-primary">{bookingData.bookingRef}</p>
+                  <p className="text-3xl font-bold text-primary">{booking.bookingReference}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-foreground/60 text-sm mb-1">Confirmation Date</p>
-                  <p className="font-semibold text-foreground">{new Date().toLocaleDateString()}</p>
+                  <p className="font-semibold text-foreground">{formatDate(booking.bookingDate)}</p>
                 </div>
               </div>
               <p className="text-foreground/60 text-sm">
@@ -117,30 +149,65 @@ function ThankYouContent() {
 
             {/* Flight Details */}
             <div className="bg-white rounded-2xl p-8 border border-border shadow-lg">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Flight Details</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-6">
+                {isRoundTrip ? 'Flight Details - Round Trip' : 'Flight Details'}
+              </h2>
 
-              {/* Route Display */}
-              <div className="grid grid-cols-3 gap-4 items-center mb-8 pb-8 border-b border-border">
-                <div>
-                  <p className="text-foreground/60 text-sm mb-2">Departure</p>
-                  <p className="text-3xl font-bold text-foreground">{flightData.departure.city}</p>
-                  <p className="text-foreground/60 text-sm mt-1">{flightData.departure.date}</p>
-                  <p className="text-foreground font-semibold">{flightData.departure.time}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-foreground/60 text-sm mb-2">{flightData.duration}</p>
-                  <div className="w-full h-1 bg-gradient-to-r from-primary to-accent rounded mb-3"></div>
-                  <p className="text-foreground/60 text-xs">
-                    {flightData.stops === 0 ? "Direct" : `${flightData.stops} stop`}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-foreground/60 text-sm mb-2">Arrival</p>
-                  <p className="text-3xl font-bold text-foreground">{flightData.arrival.city}</p>
-                  <p className="text-foreground/60 text-sm mt-1">{flightData.arrival.date}</p>
-                  <p className="text-foreground font-semibold">{flightData.arrival.time}</p>
+              {/* OUTBOUND Route Display */}
+              <div>
+                {isRoundTrip && (
+                  <p className="text-foreground/80 font-semibold text-sm mb-3 uppercase tracking-wide">Outbound Flight</p>
+                )}
+                <div className="grid grid-cols-3 gap-4 items-center mb-8 pb-8 border-b border-border">
+                  <div>
+                    <p className="text-foreground/60 text-sm mb-2">Departure</p>
+                    <p className="text-3xl font-bold text-foreground">{outboundFirst?.departureCity}</p>
+                    <p className="text-foreground/60 text-sm mt-1">{formatDate(outboundFirst?.departureTime)}</p>
+                    <p className="text-foreground font-semibold">{formatTime(outboundFirst?.departureTime)}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-foreground/60 text-sm mb-2">{formatDuration(outbound?.duration)}</p>
+                    <div className="w-full h-1 bg-gradient-to-r from-primary to-accent rounded mb-3"></div>
+                    <p className="text-foreground/60 text-xs">
+                      {outbound?.numberOfStops === 0 ? "Direct" : `${outbound?.numberOfStops} stop${outbound?.numberOfStops > 1 ? 's' : ''}`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-foreground/60 text-sm mb-2">Arrival</p>
+                    <p className="text-3xl font-bold text-foreground">{outboundLast?.arrivalCity}</p>
+                    <p className="text-foreground/60 text-sm mt-1">{formatDate(outboundLast?.arrivalTime)}</p>
+                    <p className="text-foreground font-semibold">{formatTime(outboundLast?.arrivalTime)}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* RETURN Route Display (if round-trip) */}
+              {isRoundTrip && returnFlight && (
+                <div>
+                  <p className="text-foreground/80 font-semibold text-sm mb-3 uppercase tracking-wide">Return Flight</p>
+                  <div className="grid grid-cols-3 gap-4 items-center mb-8 pb-8 border-b border-border">
+                    <div>
+                      <p className="text-foreground/60 text-sm mb-2">Departure</p>
+                      <p className="text-3xl font-bold text-foreground">{returnFirst?.departureCity}</p>
+                      <p className="text-foreground/60 text-sm mt-1">{formatDate(returnFirst?.departureTime)}</p>
+                      <p className="text-foreground font-semibold">{formatTime(returnFirst?.departureTime)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-foreground/60 text-sm mb-2">{formatDuration(returnFlight?.duration)}</p>
+                      <div className="w-full h-1 bg-gradient-to-r from-primary to-accent rounded mb-3"></div>
+                      <p className="text-foreground/60 text-xs">
+                        {returnFlight?.numberOfStops === 0 ? "Direct" : `${returnFlight?.numberOfStops} stop${returnFlight?.numberOfStops > 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-foreground/60 text-sm mb-2">Arrival</p>
+                      <p className="text-3xl font-bold text-foreground">{returnLast?.arrivalCity}</p>
+                      <p className="text-foreground/60 text-sm mt-1">{formatDate(returnLast?.arrivalTime)}</p>
+                      <p className="text-foreground font-semibold">{formatTime(returnLast?.arrivalTime)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Booking Details Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -149,19 +216,19 @@ function ThankYouContent() {
                     <Users className="w-4 h-4" />
                     Passengers
                   </p>
-                  <p className="text-xl font-bold text-foreground">{searchParams_data.passengers}</p>
+                  <p className="text-xl font-bold text-foreground">{booking.passengers}</p>
                 </div>
                 <div>
                   <p className="text-foreground/60 text-sm mb-2">Cabin Class</p>
-                  <p className="text-xl font-bold text-foreground capitalize">{searchParams_data.className}</p>
+                  <p className="text-xl font-bold text-foreground capitalize">{booking.className}</p>
                 </div>
                 <div>
                   <p className="text-foreground/60 text-sm mb-2">Selected Seats</p>
-                  <p className="text-lg font-bold text-foreground">{bookingData.selectedSeats.join(", ")}</p>
+                  <p className="text-lg font-bold text-foreground">{booking.selectedSeats.join(", ")}</p>
                 </div>
                 <div>
                   <p className="text-foreground/60 text-sm mb-2">Airline</p>
-                  <p className="text-lg font-bold text-foreground">{flightData.airline}</p>
+                  <p className="text-lg font-bold text-foreground">{flight.airlines[0] || flight.validatingAirline}</p>
                 </div>
               </div>
             </div>
@@ -170,7 +237,7 @@ function ThankYouContent() {
             <div className="bg-white rounded-2xl p-8 border border-border shadow-lg">
               <h3 className="text-xl font-bold text-foreground mb-4">Services & Baggage</h3>
               <div className="space-y-3">
-                {bookingData.selectedLuggage.map((luggage) => (
+                {booking.selectedLuggage.map((luggage) => (
                   <div key={luggage} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                     <span className="text-foreground font-medium capitalize">
                       {luggage === "standard"
@@ -195,15 +262,15 @@ function ThankYouContent() {
 
               <div className="space-y-3 mb-6 pb-6 border-b border-border">
                 <div className="flex justify-between text-sm">
-                  <span className="text-foreground/60">Base Fare</span>
+                  <span className="text-foreground/60">Base Fare ({booking.passengers} {booking.passengers === 1 ? 'passenger' : 'passengers'})</span>
                   <span className="font-semibold text-foreground">
-                    €{flightData.price * searchParams_data.passengers}
+                    {flight.currency}{(flight.price * booking.passengers).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-foreground/60">Luggage</span>
+                  <span className="text-foreground/60">Additional Services</span>
                   <span className="font-semibold text-foreground">
-                    €{bookingData.totalPrice - flightData.price * searchParams_data.passengers}
+                    {flight.currency}{(booking.totalPrice - flight.price * booking.passengers).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -211,7 +278,7 @@ function ThankYouContent() {
               <div className="flex justify-between mb-6">
                 <span className="text-lg font-bold text-foreground">Total</span>
                 <span className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  €{bookingData.totalPrice}
+                  {flight.currency}{booking.totalPrice.toFixed(2)}
                 </span>
               </div>
 
@@ -223,7 +290,7 @@ function ThankYouContent() {
         {/* Ticket Download Section */}
         <div className="bg-white rounded-2xl p-8 border border-border shadow-lg mb-12">
           <h2 className="text-2xl font-bold text-foreground mb-6">Your Booking Ticket</h2>
-          <BookingTicket bookingData={bookingData} flight={flightData} searchParams={searchParams_data} />
+          <BookingTicket bookingData={booking} flight={flight} searchParams={booking.searchParams} />
         </div>
 
         {/* Action Buttons */}

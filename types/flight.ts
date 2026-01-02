@@ -21,7 +21,7 @@ export interface Itinerary {
 
 export interface Flight {
   id: string
-  price: number
+  price: number  // Price for the selected/default cabin
   currency: string
   seats: number
   itineraries: Itinerary[]
@@ -29,4 +29,11 @@ export interface Flight {
   validatingAirline: string
   totalDuration: string
   totalStops: number
+
+  // Optional cabin-specific pricing (for showing all class options)
+  cabinPrices?: {
+    economy: number
+    business: number
+    first: number
+  }
 }
