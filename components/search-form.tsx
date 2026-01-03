@@ -2,26 +2,51 @@
 
 import type React from "react"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { WorldMap } from "@/components/world-map"
 import { CityAutocomplete } from "@/components/search/CityAutocomplete"
+import { useBooking } from "@/contexts/BookingContext"
+import { useOutboundSearch } from "@/hooks/useOutboundSearch"
 import type { SearchParams } from "@/app/page"
-import { Airport } from "@/types/airport"
+import type { Airport } from "@/types/airport"
+import type { SearchCriteria } from "@/types/search"
 
 interface SearchFormProps {
-  onSearch: (params: SearchParams) => void
-  initialParams: SearchParams | null
+  onSearch?: (params: SearchParams) => void
+  initialParams?: SearchParams | null
 }
 
 export default function SearchForm({ onSearch, initialParams }: SearchFormProps) {
-  const [tripType, setTripType] = useState<"roundtrip" | "oneway">(initialParams?.tripType || "roundtrip")
-  const [departureAirport, setDepartureAirport] = useState<Airport | null>(null)
-  const [arrivalAirport, setArrivalAirport] = useState<Airport | null>(null)
-  const [departureDate, setDepartureDate] = useState(initialParams?.departureDate || "")
-  const [returnDate, setReturnDate] = useState(initialParams?.returnDate || "")
-  const [passengers, setPassengers] = useState(initialParams?.passengers || 1)
-  const [className, setClassName] = useState<"economy" | "business" | "first">(initialParams?.className || "economy")
+  const { bookingState, setSearchCriteria, setOutboundSearchResults } = useBooking()
+  const { mutate: searchOutbound, isPending } = useOutboundSearch()
+  const router = useRouter()
+
+  // Try to restore from context first, then initialParams, then defaults
+  const savedCriteria = bookingState.searchCriteria
+
+  const [tripType, setTripType] = useState<"roundtrip" | "oneway">(
+    initialParams?.tripType || savedCriteria?.tripType || "roundtrip"
+  )
+  const [departureAirport, setDepartureAirport] = useState<Airport | null>(
+    savedCriteria?.origin || null
+  )
+  const [arrivalAirport, setArrivalAirport] = useState<Airport | null>(
+    savedCriteria?.destination || null
+  )
+  const [departureDate, setDepartureDate] = useState(
+    initialParams?.departureDate || savedCriteria?.departureDate || ""
+  )
+  const [returnDate, setReturnDate] = useState(
+    initialParams?.returnDate || savedCriteria?.returnDate || ""
+  )
+  const [passengers, setPassengers] = useState(
+    initialParams?.passengers || savedCriteria?.passengers || 1
+  )
+  const [className, setClassName] = useState<"economy" | "premium_economy" | "business" | "first">(
+    initialParams?.className || savedCriteria?.travelClass || "economy"
+  )
 
   // Create map markers from selected airports
   const departureMarker = departureAirport ? {
@@ -41,15 +66,41 @@ export default function SearchForm({ onSearch, initialParams }: SearchFormProps)
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (departureAirport && arrivalAirport && departureDate) {
-      onSearch({
+      // Build SearchCriteria for new booking context
+      const criteria: SearchCriteria = {
         tripType,
-        departureCity: departureAirport.iataCode,
-        arrivalCity: arrivalAirport.iataCode,
+        origin: departureAirport,
+        destination: arrivalAirport,
         departureDate,
-        returnDate: tripType === "roundtrip" ? returnDate : "",
+        returnDate: tripType === "roundtrip" ? returnDate : undefined,
         passengers,
-        className,
-      })
+        travelClass: className,
+      }
+
+      // Save to booking context
+      setSearchCriteria(criteria)
+
+      // Call old onSearch callback if provided (backward compatibility)
+      if (onSearch) {
+        onSearch({
+          tripType,
+          departureCity: departureAirport.iataCode,
+          arrivalCity: arrivalAirport.iataCode,
+          departureDate,
+          returnDate: tripType === "roundtrip" ? returnDate : "",
+          passengers,
+          className,
+        })
+      } else {
+        // New flow: search outbound flights and navigate to results
+        searchOutbound(criteria, {
+          onSuccess: (data) => {
+            // Save search results to context for persistence across navigation
+            setOutboundSearchResults(data.flights, data.rawOffers)
+            router.push('/flights/outbound')
+          },
+        })
+      }
     }
   }
 
@@ -175,6 +226,7 @@ export default function SearchForm({ onSearch, initialParams }: SearchFormProps)
                 className="w-full px-4 py-3 border-2 border-blue-100/50 rounded-xl bg-white text-foreground focus:outline-none focus:border-primary focus:shadow-lg transition-all font-medium"
               >
                 <option value="economy">Economy</option>
+                <option value="premium_economy">Premium Economy</option>
                 <option value="business">Business</option>
                 <option value="first">First Class</option>
               </select>
@@ -185,9 +237,10 @@ export default function SearchForm({ onSearch, initialParams }: SearchFormProps)
         {/* Search Button */}
         <Button
           type="submit"
-          className="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-primary-foreground py-4 rounded-xl font-bold text-lg transition-all duration-200 transform hover:scale-105 active:scale-95"
+          disabled={isPending}
+          className="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-xl text-primary-foreground py-4 rounded-xl font-bold text-lg transition-all duration-200 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Explore Flights
+          {isPending ? "Searching..." : "Explore Flights"}
         </Button>
       </form>
     </div>

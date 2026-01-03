@@ -5,7 +5,8 @@ import { useEffect, useState, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import BookingTicket from "@/components/booking-ticket"
 import { Check, Users } from "lucide-react"
-
+import { useBooking } from "@/contexts/BookingContext"
+import type { BookingState } from "@/types/booking"
 import type { Flight } from "@/types/flight"
 
 // Helper functions for formatting
@@ -58,57 +59,95 @@ function formatDuration(isoDuration: string): string {
 interface BookingData {
   bookingReference: string
   bookingDate: string
-  flight: Flight
-  selectedSeats: string[]
-  selectedLuggage: string[]
+  outboundFlight: {
+    flight: Flight
+    selectedSeats: string[]
+    selectedLuggage: string[]
+  }
+  returnFlight: {
+    flight: Flight
+    selectedSeats: string[]
+    selectedLuggage: string[]
+  } | null
+  searchCriteria: any
   totalPrice: number
-  passengers: number
-  className: string
-  searchParams: any
+}
+
+function calculateTotal(state: BookingState): number {
+  let total = state.outboundFlight.flight?.price || 0
+  if (state.returnFlight?.flight) {
+    total += state.returnFlight.flight.price
+  }
+  // Add luggage costs
+  const luggagePrices = { extra1: 45, extra2: 65 } as const
+  state.outboundFlight.selectedLuggage.forEach(id => {
+    if (id === 'extra1' || id === 'extra2') total += luggagePrices[id]
+  })
+  if (state.returnFlight) {
+    state.returnFlight.selectedLuggage.forEach(id => {
+      if (id === 'extra1' || id === 'extra2') total += luggagePrices[id]
+    })
+  }
+  return total
 }
 
 function ThankYouContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { bookingState } = useBooking()
   const [booking, setBooking] = useState<BookingData | null>(null)
 
   useEffect(() => {
-    // Read booking data from sessionStorage
-    const stored = sessionStorage.getItem('flightBooking')
+    const ref = searchParams.get('ref')
 
-    if (!stored) {
-      // No booking data found, redirect to home
-      router.push("/")
+    if (!ref) {
+      router.push('/')
       return
     }
 
-    try {
-      const bookingData = JSON.parse(stored)
+    // Use BookingContext instead of sessionStorage
+    if (bookingState.outboundFlight.flight && bookingState.searchCriteria) {
+      const bookingData: BookingData = {
+        bookingReference: ref,
+        bookingDate: new Date().toISOString(),
+        outboundFlight: {
+          flight: bookingState.outboundFlight.flight,
+          selectedSeats: bookingState.outboundFlight.selectedSeats,
+          selectedLuggage: bookingState.outboundFlight.selectedLuggage,
+        },
+        returnFlight: bookingState.returnFlight?.flight ? {
+          flight: bookingState.returnFlight.flight,
+          selectedSeats: bookingState.returnFlight.selectedSeats,
+          selectedLuggage: bookingState.returnFlight.selectedLuggage,
+        } : null,
+        searchCriteria: bookingState.searchCriteria,
+        totalPrice: calculateTotal(bookingState)
+      }
       setBooking(bookingData)
-      // Clear sessionStorage after reading to prevent reuse
-      sessionStorage.removeItem('flightBooking')
-    } catch (error) {
-      console.error("Failed to parse booking data:", error)
-      router.push("/")
+    } else {
+      router.push('/')
     }
-  }, [router])
+  }, [bookingState, searchParams, router])
 
   if (!booking) {
     return <div className="min-h-screen flex items-center justify-center">Loading booking details...</div>
   }
 
   // Extract flight data
-  const flight = booking.flight
-  const isRoundTrip = flight.itineraries.length > 1
+  const outboundFlight = booking.outboundFlight.flight
+  const returnFlightData = booking.returnFlight
+  const isRoundTrip = !!returnFlightData
 
-  // Outbound flight
-  const outbound = flight.itineraries[0]
+  // Outbound flight itinerary
+  const outbound = outboundFlight.itineraries[0]
   const outboundFirst = outbound?.segments[0]
   const outboundLast = outbound?.segments[outbound?.segments.length - 1]
 
-  // Return flight (if exists)
-  const returnFlight = flight.itineraries[1]
-  const returnFirst = returnFlight?.segments[0]
-  const returnLast = returnFlight?.segments[returnFlight?.segments.length - 1]
+  // Return flight itinerary (if exists)
+  const returnFlight = returnFlightData?.flight
+  const returnItinerary = returnFlight?.itineraries[0]
+  const returnFirst = returnItinerary?.segments[0]
+  const returnLast = returnItinerary?.segments[returnItinerary?.segments.length - 1]
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-blue-50/20">
@@ -182,7 +221,7 @@ function ThankYouContent() {
               </div>
 
               {/* RETURN Route Display (if round-trip) */}
-              {isRoundTrip && returnFlight && (
+              {isRoundTrip && returnFlight && returnItinerary && (
                 <div>
                   <p className="text-foreground/80 font-semibold text-sm mb-3 uppercase tracking-wide">Return Flight</p>
                   <div className="grid grid-cols-3 gap-4 items-center mb-8 pb-8 border-b border-border">
@@ -193,10 +232,10 @@ function ThankYouContent() {
                       <p className="text-foreground font-semibold">{formatTime(returnFirst?.departureTime)}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-foreground/60 text-sm mb-2">{formatDuration(returnFlight?.duration)}</p>
+                      <p className="text-foreground/60 text-sm mb-2">{formatDuration(returnItinerary?.duration)}</p>
                       <div className="w-full h-1 bg-gradient-to-r from-primary to-accent rounded mb-3"></div>
                       <p className="text-foreground/60 text-xs">
-                        {returnFlight?.numberOfStops === 0 ? "Direct" : `${returnFlight?.numberOfStops} stop${returnFlight?.numberOfStops > 1 ? 's' : ''}`}
+                        {returnItinerary?.numberOfStops === 0 ? "Direct" : `${returnItinerary?.numberOfStops} stop${returnItinerary?.numberOfStops > 1 ? 's' : ''}`}
                       </p>
                     </div>
                     <div className="text-right">
@@ -216,42 +255,80 @@ function ThankYouContent() {
                     <Users className="w-4 h-4" />
                     Passengers
                   </p>
-                  <p className="text-xl font-bold text-foreground">{booking.passengers}</p>
+                  <p className="text-xl font-bold text-foreground">{booking.searchCriteria?.passengers || 1}</p>
                 </div>
                 <div>
                   <p className="text-foreground/60 text-sm mb-2">Cabin Class</p>
-                  <p className="text-xl font-bold text-foreground capitalize">{booking.className}</p>
+                  <p className="text-xl font-bold text-foreground capitalize">{(booking.searchCriteria?.travelClass || '').replace('_', ' ')}</p>
                 </div>
                 <div>
-                  <p className="text-foreground/60 text-sm mb-2">Selected Seats</p>
-                  <p className="text-lg font-bold text-foreground">{booking.selectedSeats.join(", ")}</p>
+                  <p className="text-foreground/60 text-sm mb-2">Outbound Seats</p>
+                  <p className="text-lg font-bold text-foreground">{booking.outboundFlight.selectedSeats.join(", ")}</p>
                 </div>
                 <div>
                   <p className="text-foreground/60 text-sm mb-2">Airline</p>
-                  <p className="text-lg font-bold text-foreground">{flight.airlines[0] || flight.validatingAirline}</p>
+                  <p className="text-lg font-bold text-foreground">{outboundFlight.airlines[0] || outboundFlight.validatingAirline}</p>
                 </div>
               </div>
+
+              {/* Return seats (if round-trip) */}
+              {isRoundTrip && returnFlightData && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div>
+                    <p className="text-foreground/60 text-sm mb-2">Return Seats</p>
+                    <p className="text-lg font-bold text-foreground">{returnFlightData.selectedSeats.join(", ")}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Services Added */}
             <div className="bg-white rounded-2xl p-8 border border-border shadow-lg">
               <h3 className="text-xl font-bold text-foreground mb-4">Services & Baggage</h3>
-              <div className="space-y-3">
-                {booking.selectedLuggage.map((luggage) => (
-                  <div key={luggage} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                    <span className="text-foreground font-medium capitalize">
-                      {luggage === "standard"
-                        ? "Standard Luggage"
-                        : luggage === "cabin"
-                          ? "Cabin Baggage"
-                          : luggage === "extra1"
-                            ? "1st Extra Bag"
-                            : "2nd Extra Bag"}
+
+              {/* Outbound Luggage */}
+              <div className="mb-6">
+                <p className="text-foreground/80 font-semibold text-sm mb-3">Outbound Flight</p>
+                <div className="space-y-2">
+                  {booking.outboundFlight.selectedLuggage.map((luggage) => (
+                    <div key={`outbound-${luggage}`} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                      <span className="text-foreground font-medium capitalize">
+                        {luggage === "standard"
+                          ? "Standard Luggage"
+                          : luggage === "cabin"
+                            ? "Cabin Baggage"
+                            : luggage === "extra1"
+                              ? "1st Extra Bag"
+                              : "2nd Extra Bag"}
                     </span>
                     <span className="text-accent font-semibold">✓</span>
                   </div>
                 ))}
               </div>
+            </div>
+
+              {/* Return Luggage (if round-trip) */}
+              {isRoundTrip && returnFlightData && (
+                <div>
+                  <p className="text-foreground/80 font-semibold text-sm mb-3">Return Flight</p>
+                  <div className="space-y-2">
+                    {returnFlightData.selectedLuggage.map((luggage) => (
+                      <div key={`return-${luggage}`} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <span className="text-foreground font-medium capitalize">
+                          {luggage === "standard"
+                            ? "Standard Luggage"
+                            : luggage === "cabin"
+                              ? "Cabin Baggage"
+                              : luggage === "extra1"
+                                ? "1st Extra Bag"
+                                : "2nd Extra Bag"}
+                        </span>
+                        <span className="text-accent font-semibold">✓</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -262,15 +339,23 @@ function ThankYouContent() {
 
               <div className="space-y-3 mb-6 pb-6 border-b border-border">
                 <div className="flex justify-between text-sm">
-                  <span className="text-foreground/60">Base Fare ({booking.passengers} {booking.passengers === 1 ? 'passenger' : 'passengers'})</span>
+                  <span className="text-foreground/60">Outbound Flight</span>
                   <span className="font-semibold text-foreground">
-                    {flight.currency}{(flight.price * booking.passengers).toFixed(2)}
+                    {outboundFlight.currency}{outboundFlight.price.toFixed(2)}
                   </span>
                 </div>
+                {isRoundTrip && returnFlight && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-foreground/60">Return Flight</span>
+                    <span className="font-semibold text-foreground">
+                      {returnFlight.currency}{returnFlight.price.toFixed(2)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-foreground/60">Additional Services</span>
+                  <span className="text-foreground/60">Extra Services & Luggage</span>
                   <span className="font-semibold text-foreground">
-                    {flight.currency}{(booking.totalPrice - flight.price * booking.passengers).toFixed(2)}
+                    {outboundFlight.currency}{(booking.totalPrice - outboundFlight.price - (returnFlight?.price || 0)).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -278,7 +363,7 @@ function ThankYouContent() {
               <div className="flex justify-between mb-6">
                 <span className="text-lg font-bold text-foreground">Total</span>
                 <span className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  {flight.currency}{booking.totalPrice.toFixed(2)}
+                  {outboundFlight.currency}{booking.totalPrice.toFixed(2)}
                 </span>
               </div>
 
@@ -288,14 +373,42 @@ function ThankYouContent() {
         </div>
 
         {/* Ticket Download Section */}
-        <div className="bg-white rounded-2xl p-8 border border-border shadow-lg mb-12">
-          <h2 className="text-2xl font-bold text-foreground mb-6">Your Booking Ticket</h2>
-          <BookingTicket bookingData={booking} flight={flight} searchParams={booking.searchParams} />
+        <div className="space-y-8 mb-12">
+          {/* Outbound Ticket */}
+          <div className="bg-white rounded-2xl p-8 border border-border shadow-lg">
+            <h2 className="text-2xl font-bold text-foreground mb-6">
+              {isRoundTrip ? "Outbound Flight Ticket" : "Your Booking Ticket"}
+            </h2>
+            <BookingTicket
+              bookingData={{
+                ...booking,
+                totalPrice: outboundFlight.price + booking.outboundFlight.selectedLuggage.filter(l => l === 'extra1' || l === 'extra2').reduce((sum, l) => sum + (l === 'extra1' ? 45 : 65), 0)
+              }}
+              flight={outboundFlight}
+              searchParams={booking.searchCriteria}
+            />
+          </div>
+
+          {/* Return Ticket (if round-trip) */}
+          {isRoundTrip && returnFlight && (
+            <div className="bg-white rounded-2xl p-8 border border-border shadow-lg">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Return Flight Ticket</h2>
+              <BookingTicket
+                bookingData={{
+                  ...booking,
+                  outboundFlight: returnFlightData!,
+                  totalPrice: returnFlight.price + returnFlightData!.selectedLuggage.filter(l => l === 'extra1' || l === 'extra2').reduce((sum, l) => sum + (l === 'extra1' ? 45 : 65), 0)
+                }}
+                flight={returnFlight}
+                searchParams={booking.searchCriteria}
+              />
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex gap-4 justify-center">
-          <Button onClick={() => router.push("/")} variant="outline" className="px-8 py-6 text-lg font-semibold">
+          <Button onClick={() => router.push("/search")} variant="outline" className="px-8 py-6 text-lg font-semibold">
             Back to Search
           </Button>
           <Button className="px-8 py-6 text-lg font-semibold bg-primary hover:bg-primary/90">View My Bookings</Button>

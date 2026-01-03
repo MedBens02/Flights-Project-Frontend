@@ -61,3 +61,53 @@ export async function searchFlights(criteria: SearchCriteria): Promise<{
   // Backend now returns { flights: Flight[], rawOffers: Record<string, any> }
   return res.json()
 }
+
+/**
+ * Search only outbound flights (one-way search)
+ * Backend endpoint: POST /api/flights/search (with returnDate=null)
+ */
+export async function searchOutboundFlights(criteria: SearchCriteria): Promise<{
+  flights: Flight[]
+  rawOffers: Record<string, any>
+}> {
+  const res = await fetch(`${API_BASE_URL}/flights/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      originLocationCode: criteria.origin?.iataCode,
+      destinationLocationCode: criteria.destination?.iataCode,
+      departureDate: criteria.departureDate + 'T00:00:00Z',
+      returnDate: null, // Force one-way search
+      adults: criteria.passengers,
+      travelClass: criteria.travelClass.toUpperCase(),
+    }),
+  })
+  if (!res.ok) throw new Error('Failed to search outbound flights')
+  return res.json()
+}
+
+/**
+ * Search only return flights (one-way search with swapped origin/destination)
+ * Backend endpoint: POST /api/flights/search (with departure date = return date)
+ */
+export async function searchReturnFlights(criteria: SearchCriteria): Promise<{
+  flights: Flight[]
+  rawOffers: Record<string, any>
+}> {
+  if (!criteria.returnDate) throw new Error('Return date required')
+
+  const res = await fetch(`${API_BASE_URL}/flights/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      originLocationCode: criteria.destination?.iataCode,  // SWAPPED
+      destinationLocationCode: criteria.origin?.iataCode,  // SWAPPED
+      departureDate: criteria.returnDate + 'T00:00:00Z',
+      returnDate: null, // One-way search
+      adults: criteria.passengers,
+      travelClass: criteria.travelClass.toUpperCase(),
+    }),
+  })
+  if (!res.ok) throw new Error('Failed to search return flights')
+  return res.json()
+}
