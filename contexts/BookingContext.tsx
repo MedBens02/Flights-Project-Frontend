@@ -12,8 +12,8 @@ interface BookingContextType {
   setCurrentStep: (step: BookingStep) => void
   selectOutboundFlight: (flight: Flight, rawOffer: any) => void
   selectReturnFlight: (flight: Flight, rawOffer: any) => void
-  updateOutboundSeats: (seats: string[], luggage: string[]) => void
-  updateReturnSeats: (seats: string[], luggage: string[]) => void
+  updateOutboundSeats: (seats: string[], luggage: string[], extrasPrice?: number) => void
+  updateReturnSeats: (seats: string[], luggage: string[], extrasPrice?: number) => void
   setOutboundSearchResults: (flights: Flight[], rawOffers: Record<string, any>) => void
   setReturnSearchResults: (flights: Flight[], rawOffers: Record<string, any>) => void
   resetBooking: () => void
@@ -40,27 +40,30 @@ const initialState: BookingState = {
 const BookingContext = createContext<BookingContextType | undefined>(undefined)
 
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const [bookingState, setBookingState] = useState<BookingState>(() => {
-    // Try to restore from sessionStorage on mount
+  const [bookingState, setBookingState] = useState<BookingState>(initialState)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  // Restore from sessionStorage AFTER hydration
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = sessionStorage.getItem('bookingState')
       if (stored) {
         try {
-          return JSON.parse(stored)
+          setBookingState(JSON.parse(stored))
         } catch {
-          return initialState
+          // Keep initial state on error
         }
       }
+      setIsHydrated(true)
     }
-    return initialState
-  })
+  }, [])
 
-  // Persist to sessionStorage on state changes
+  // Persist to sessionStorage on state changes (but only after initial hydration)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isHydrated && typeof window !== 'undefined') {
       sessionStorage.setItem('bookingState', JSON.stringify(bookingState))
     }
-  }, [bookingState])
+  }, [bookingState, isHydrated])
 
   const setSearchCriteria = (criteria: SearchCriteria) => {
     setBookingState(prev => ({
@@ -112,18 +115,19 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     }))
   }
 
-  const updateOutboundSeats = (seats: string[], luggage: string[]) => {
+  const updateOutboundSeats = (seats: string[], luggage: string[], extrasPrice?: number) => {
     setBookingState(prev => ({
       ...prev,
       outboundFlight: {
         ...prev.outboundFlight,
         selectedSeats: seats,
-        selectedLuggage: luggage
+        selectedLuggage: luggage,
+        extrasPrice: extrasPrice || 0
       }
     }))
   }
 
-  const updateReturnSeats = (seats: string[], luggage: string[]) => {
+  const updateReturnSeats = (seats: string[], luggage: string[], extrasPrice?: number) => {
     if (!bookingState.returnFlight) return
 
     setBookingState(prev => ({
@@ -131,7 +135,8 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       returnFlight: prev.returnFlight ? {
         ...prev.returnFlight,
         selectedSeats: seats,
-        selectedLuggage: luggage
+        selectedLuggage: luggage,
+        extrasPrice: extrasPrice || 0
       } : null
     }))
   }

@@ -42,24 +42,14 @@ export default function BookingReview() {
       total += returnFlight.flight.price
     }
 
-    // Add luggage costs for both legs
-    const luggagePrices = {
-      extra1: 45,
-      extra2: 65,
+    // Add extras (seats + luggage) for outbound
+    if (outboundFlight.extrasPrice) {
+      total += outboundFlight.extrasPrice
     }
 
-    outboundFlight.selectedLuggage.forEach(id => {
-      if (id === 'extra1' || id === 'extra2') {
-        total += luggagePrices[id]
-      }
-    })
-
-    if (returnFlight) {
-      returnFlight.selectedLuggage.forEach(id => {
-        if (id === 'extra1' || id === 'extra2') {
-          total += luggagePrices[id]
-        }
-      })
+    // Add extras (seats + luggage) for return
+    if (returnFlight?.extrasPrice) {
+      total += returnFlight.extrasPrice
     }
 
     return total
@@ -208,16 +198,18 @@ export default function BookingReview() {
               </div>
             )}
 
-            {/* Extra luggage costs */}
-            {(outboundFlight.selectedLuggage.includes('extra1') ||
-              outboundFlight.selectedLuggage.includes('extra2') ||
-              returnFlight?.selectedLuggage.includes('extra1') ||
-              returnFlight?.selectedLuggage.includes('extra2')) && (
+            {/* Extras (Seats & Luggage) */}
+            {outboundFlight.extrasPrice && outboundFlight.extrasPrice > 0 && (
               <div className="flex justify-between text-foreground/80">
-                <span>Extra Luggage</span>
-                <span className="font-semibold">
-                  €{(totalPrice - outboundFlight.flight.price - (returnFlight?.flight.price || 0)).toFixed(2)}
-                </span>
+                <span>Outbound Extras (Seats & Luggage)</span>
+                <span className="font-semibold">€{outboundFlight.extrasPrice.toFixed(2)}</span>
+              </div>
+            )}
+
+            {returnFlight?.extrasPrice && returnFlight.extrasPrice > 0 && (
+              <div className="flex justify-between text-foreground/80">
+                <span>Return Extras (Seats & Luggage)</span>
+                <span className="font-semibold">€{returnFlight.extrasPrice.toFixed(2)}</span>
               </div>
             )}
 

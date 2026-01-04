@@ -104,13 +104,13 @@ export default function OutboundResultsView() {
     setSelectedFlight(flight)
   }
 
-  const handleConfirmSelection = (seats: string[], luggage: string[]) => {
+  const handleConfirmSelection = (seats: string[], luggage: string[], extrasPrice: number) => {
     if (selectedFlight) {
       // Save selected outbound flight to booking context
       selectOutboundFlight(selectedFlight, rawOffers[selectedFlight.id])
 
-      // Save seat and luggage selections
-      updateOutboundSeats(seats, luggage)
+      // Save seat and luggage selections with extras price
+      updateOutboundSeats(seats, luggage, extrasPrice)
 
       // Navigate to next step based on trip type
       if (searchCriteria?.tripType === 'roundtrip') {

@@ -2,6 +2,7 @@ import { Airport } from '@/types/airport'
 import { Flight } from '@/types/flight'
 import { SearchCriteria } from '@/types/search'
 import { MOCK_AIRPORTS, generateMockFlights } from './mockData'
+import type { SeatMapRequest, SeatMapResponse, UpsellRequest, UpsellResponse } from '@/types/amadeus'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:7001/api'
 const USE_MOCK_DATA = false  // Backend is now ready!
@@ -109,5 +110,81 @@ export async function searchReturnFlights(criteria: SearchCriteria): Promise<{
     }),
   })
   if (!res.ok) throw new Error('Failed to search return flights')
+  return res.json()
+}
+
+/**
+ * Get seat map for a flight offer
+ * Amadeus API: POST /v1/shopping/seatmaps
+ */
+export async function getSeatMap(flightOffer: any): Promise<SeatMapResponse> {
+  console.log('📡 getSeatMap called with:', flightOffer)
+  console.log('📡 flightOffer ID:', flightOffer?.id)
+  console.log('📡 flightOffer keys:', Object.keys(flightOffer || {}))
+  console.log('📡 flightOffer itineraries:', flightOffer?.itineraries)
+  console.log('📡 flightOffer travelerPricings:', flightOffer?.travelerPricings)
+
+  if (!flightOffer) {
+    throw new Error('Flight offer is required for seat map lookup')
+  }
+
+  const requestBody: SeatMapRequest = {
+    data: [{
+      type: 'flight-offer',
+      id: flightOffer.id || '1',
+      source: flightOffer.source || 'GDS',
+      itineraries: flightOffer.itineraries || [],
+      travelerPricings: flightOffer.travelerPricings || [],
+      ...flightOffer
+    }]
+  }
+
+  console.log('📡 Request body being sent:', JSON.stringify(requestBody, null, 2))
+
+  const res = await fetch(`${API_BASE_URL}/seatmaps`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch seat map: ${res.status}`)
+  }
+
+  return res.json()
+}
+
+/**
+ * Get flight upsell options (cabin upgrades, branded fares)
+ * Amadeus API: POST /v1/shopping/flight-offers/upselling
+ */
+export async function getFlightUpsells(flightOffer: any): Promise<UpsellResponse> {
+  console.log('📡 getFlightUpsells called with:', flightOffer)
+  console.log('📡 flightOffer ID:', flightOffer?.id)
+  console.log('📡 flightOffer keys:', Object.keys(flightOffer || {}))
+
+  if (!flightOffer) {
+    throw new Error('Flight offer is required for upsell lookup')
+  }
+
+  const requestBody: UpsellRequest = {
+    data: {
+      type: 'flight-offers-upselling',
+      flightOffers: [flightOffer]
+    }
+  }
+
+  console.log('📡 Request body being sent:', JSON.stringify(requestBody, null, 2))
+
+  const res = await fetch(`${API_BASE_URL}/upsells`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch flight upsells: ${res.status}`)
+  }
+
   return res.json()
 }

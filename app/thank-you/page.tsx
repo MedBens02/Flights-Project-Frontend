@@ -63,11 +63,13 @@ interface BookingData {
     flight: Flight
     selectedSeats: string[]
     selectedLuggage: string[]
+    extrasPrice?: number
   }
   returnFlight: {
     flight: Flight
     selectedSeats: string[]
     selectedLuggage: string[]
+    extrasPrice?: number
   } | null
   searchCriteria: any
   totalPrice: number
@@ -78,15 +80,12 @@ function calculateTotal(state: BookingState): number {
   if (state.returnFlight?.flight) {
     total += state.returnFlight.flight.price
   }
-  // Add luggage costs
-  const luggagePrices = { extra1: 45, extra2: 65 } as const
-  state.outboundFlight.selectedLuggage.forEach(id => {
-    if (id === 'extra1' || id === 'extra2') total += luggagePrices[id]
-  })
-  if (state.returnFlight) {
-    state.returnFlight.selectedLuggage.forEach(id => {
-      if (id === 'extra1' || id === 'extra2') total += luggagePrices[id]
-    })
+  // Add extras (seats + luggage)
+  if (state.outboundFlight.extrasPrice) {
+    total += state.outboundFlight.extrasPrice
+  }
+  if (state.returnFlight?.extrasPrice) {
+    total += state.returnFlight.extrasPrice
   }
   return total
 }
@@ -114,11 +113,13 @@ function ThankYouContent() {
           flight: bookingState.outboundFlight.flight,
           selectedSeats: bookingState.outboundFlight.selectedSeats,
           selectedLuggage: bookingState.outboundFlight.selectedLuggage,
+          extrasPrice: bookingState.outboundFlight.extrasPrice,
         },
         returnFlight: bookingState.returnFlight?.flight ? {
           flight: bookingState.returnFlight.flight,
           selectedSeats: bookingState.returnFlight.selectedSeats,
           selectedLuggage: bookingState.returnFlight.selectedLuggage,
+          extrasPrice: bookingState.returnFlight.extrasPrice,
         } : null,
         searchCriteria: bookingState.searchCriteria,
         totalPrice: calculateTotal(bookingState)
@@ -352,12 +353,22 @@ function ThankYouContent() {
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-foreground/60">Extra Services & Luggage</span>
-                  <span className="font-semibold text-foreground">
-                    {outboundFlight.currency}{(booking.totalPrice - outboundFlight.price - (returnFlight?.price || 0)).toFixed(2)}
-                  </span>
-                </div>
+                {booking.outboundFlight.extrasPrice && booking.outboundFlight.extrasPrice > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-foreground/60">Outbound Extras (Seats & Luggage)</span>
+                    <span className="font-semibold text-foreground">
+                      {outboundFlight.currency}{booking.outboundFlight.extrasPrice.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {isRoundTrip && booking.returnFlight?.extrasPrice && booking.returnFlight.extrasPrice > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-foreground/60">Return Extras (Seats & Luggage)</span>
+                    <span className="font-semibold text-foreground">
+                      {outboundFlight.currency}{booking.returnFlight.extrasPrice.toFixed(2)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between mb-6">
@@ -382,7 +393,7 @@ function ThankYouContent() {
             <BookingTicket
               bookingData={{
                 ...booking,
-                totalPrice: outboundFlight.price + booking.outboundFlight.selectedLuggage.filter(l => l === 'extra1' || l === 'extra2').reduce((sum, l) => sum + (l === 'extra1' ? 45 : 65), 0)
+                totalPrice: outboundFlight.price + (booking.outboundFlight.extrasPrice || 0)
               }}
               flight={outboundFlight}
               searchParams={booking.searchCriteria}
@@ -397,7 +408,7 @@ function ThankYouContent() {
                 bookingData={{
                   ...booking,
                   outboundFlight: returnFlightData!,
-                  totalPrice: returnFlight.price + returnFlightData!.selectedLuggage.filter(l => l === 'extra1' || l === 'extra2').reduce((sum, l) => sum + (l === 'extra1' ? 45 : 65), 0)
+                  totalPrice: returnFlight.price + (booking.returnFlight?.extrasPrice || 0)
                 }}
                 flight={returnFlight}
                 searchParams={booking.searchCriteria}

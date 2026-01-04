@@ -137,13 +137,13 @@ export default function ReturnResultsView() {
     setSelectedFlight(flight)
   }
 
-  const handleConfirmSelection = (seats: string[], luggage: string[]) => {
+  const handleConfirmSelection = (seats: string[], luggage: string[], extrasPrice: number) => {
     if (selectedFlight) {
       // Save selected return flight to booking context
       selectReturnFlight(selectedFlight, rawOffers[selectedFlight.id])
 
-      // Save seat and luggage selections
-      updateReturnSeats(seats, luggage)
+      // Save seat and luggage selections with extras price
+      updateReturnSeats(seats, luggage, extrasPrice)
 
       // Navigate to review step
       router.push('/review')

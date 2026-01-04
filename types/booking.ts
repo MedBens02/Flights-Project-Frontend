@@ -1,11 +1,17 @@
 import { Flight } from './flight'
 import { SearchCriteria } from './search'
+import { SeatMapData, UpsellFlightOffer } from './amadeus'
 
 export interface FlightLegSelection {
   flight: Flight | null
   rawOffer: any
   selectedSeats: string[]
   selectedLuggage: string[]
+  extrasPrice?: number  // Total price for seats and extra luggage
+
+  // Cache transformed API data
+  seatMapData?: SeatMapData[]
+  upsellData?: UpsellFlightOffer[]
 }
 
 export interface SearchResults {
