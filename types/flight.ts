@@ -11,6 +11,7 @@ export interface Segment {
   duration: string              // ISO duration "PT2H30M"
   sequenceNumber: number
   aircraftCode: string
+  availableSeats?: number       // Per-segment seat availability (optional for backward compatibility)
 }
 
 export interface Itinerary {

@@ -105,7 +105,8 @@ export function generateMockFlights(criteria: SearchCriteria): Flight[] {
       airlineName: airline,
       duration: isoDuration,
       sequenceNumber: 0,
-      aircraftCode: ['320', '321', '737', '738', '777', '787'][Math.floor(Math.random() * 6)]
+      aircraftCode: ['A320', 'A350', 'B737', 'B787'][Math.floor(Math.random() * 4)],
+      availableSeats: Math.floor(Math.random() * 20) + 3  // Per-segment seat availability
     }]
 
     const itineraries = [{
@@ -139,7 +140,8 @@ export function generateMockFlights(criteria: SearchCriteria): Flight[] {
           airlineName: airline,
           duration: isoDuration,
           sequenceNumber: 0,
-          aircraftCode: ['320', '321', '737', '738', '777', '787'][Math.floor(Math.random() * 6)]
+          aircraftCode: ['320', '321', '737', '738', '777', '787'][Math.floor(Math.random() * 6)],
+          availableSeats: Math.floor(Math.random() * 20) + 3  // Per-segment seat availability
         }],
         numberOfStops: stops
       })

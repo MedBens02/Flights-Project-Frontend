@@ -67,7 +67,30 @@ const AIRCRAFT_TYPES: AircraftConfig[] = [
 ]
 
 /**
+ * Select aircraft by ICAO code (e.g., 'A320', 'B737')
+ * Falls back to flight ID-based selection if code not found
+ */
+function selectAircraftByCode(aircraftCode: string, flightId: string): AircraftConfig {
+  const mapping: Record<string, number> = {
+    'A320': 0,
+    'A350': 1,
+    'B787': 2,
+    'B737': 3,
+  }
+
+  const index = mapping[aircraftCode]
+  if (index !== undefined) {
+    return AIRCRAFT_TYPES[index]
+  }
+
+  // Fallback to flight ID-based selection
+  const id = parseInt(flightId) || 1
+  return AIRCRAFT_TYPES[id % AIRCRAFT_TYPES.length]
+}
+
+/**
  * Deterministically select aircraft type based on flight ID
+ * @deprecated Use selectAircraftByCode instead
  */
 function selectAircraftForFlight(flight: Flight): AircraftConfig {
   const flightId = parseInt(flight.id) || 1
@@ -80,9 +103,10 @@ function selectAircraftForFlight(flight: Flight): AircraftConfig {
 /**
  * Deterministic hash function for seat position
  * Returns a value between 0.00 and 1.00
+ * Includes segment index to ensure different seat patterns for multi-segment flights
  */
-function hashSeatPosition(flightId: string, row: number, column: string): number {
-  const str = `${flightId}-${row}-${column}`
+function hashSeatPosition(flightId: string, segmentIndex: number, row: number, column: string): number {
+  const str = `${flightId}-seg${segmentIndex}-${row}-${column}`
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     hash = ((hash << 5) - hash) + str.charCodeAt(i)
@@ -95,16 +119,26 @@ function hashSeatPosition(flightId: string, row: number, column: string): number
  * Generate realistic mock seat map based on flight and cabin class
  * Matches the number of booked seats to flight.seats available count
  * Returns seats with aircraft configuration (columns and aisle positions)
+ *
+ * @param flight - The flight object
+ * @param cabinClass - The travel class (economy, business, etc.)
+ * @param segmentIndex - Optional segment index for multi-segment flights (defaults to 0)
  */
 export function generateMockSeatMap(
   flight: Flight,
-  cabinClass: TravelClass
+  cabinClass: TravelClass,
+  segmentIndex: number = 0
 ): {
   seats: UISeat[]
   columns: string[]
   aislePositions: number[]
 } {
-  const aircraft = selectAircraftForFlight(flight)
+  // Get segment-specific data if available
+  const segment = flight.itineraries[0]?.segments[segmentIndex]
+  const aircraftCode = segment?.aircraftCode || ''
+
+  // Select aircraft by code (with fallback to flight ID-based selection)
+  const aircraft = selectAircraftByCode(aircraftCode, flight.id)
   const classConfig = aircraft.rowsByClass[cabinClass]
 
   // Skip if this aircraft doesn't have this cabin class
@@ -113,7 +147,9 @@ export function generateMockSeatMap(
   }
 
   const totalSeats = (classConfig.endRow - classConfig.startRow + 1) * aircraft.columns.length
-  const availableSeats = flight.seats  // from API response
+
+  // Use segment-specific available seats if present, otherwise fall back to flight-level seats
+  const availableSeats = segment?.availableSeats ?? flight.seats
   const bookedCount = Math.max(0, Math.min(totalSeats, totalSeats - availableSeats))
 
   // Calculate base seat price proportional to flight cost
@@ -147,8 +183,8 @@ export function generateMockSeatMap(
       const column = aircraft.columns[colIndex]
       const seatId = `${row}${column}`
 
-      // Deterministic hash based on flight ID + seat position
-      const seatHash = hashSeatPosition(flight.id, row, column)
+      // Deterministic hash based on flight ID + segment index + seat position
+      const seatHash = hashSeatPosition(flight.id, segmentIndex, row, column)
 
       // Determine seat characteristics
       const isWindow = colIndex === 0 || colIndex === aircraft.columns.length - 1

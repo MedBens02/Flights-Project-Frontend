@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: "SkySearch - Flight Booking",
   description: "Find and book the best flights with SkySearch. Compare prices, filters, and book your perfect journey.",
   icons: {
-    icon: "/icon.svg",
+    icon: "/logo.ico",
     apple: "/logo.png",
   },
 }

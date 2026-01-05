@@ -85,10 +85,10 @@ export default function FlightLegSelectionModal({
   // Get current segment's selected seats
   const selectedSeats = seatSelectionsBySegment[activeSegmentIndex] || []
 
-  // Generate mock seat map data
+  // Generate mock seat map data (regenerates when segment changes)
   const { seats: transformedSeats, columns: seatColumns, aislePositions } = useMemo(() => {
-    return generateMockSeatMap(flight, cabinClass)
-  }, [flight, cabinClass])
+    return generateMockSeatMap(flight, cabinClass, activeSegmentIndex)
+  }, [flight, cabinClass, activeSegmentIndex])
 
   // Generate mock luggage options
   const transformedLuggage: UILuggageOption[] = useMemo(() => {

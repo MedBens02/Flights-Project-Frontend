@@ -76,6 +76,22 @@ function calculateLayover(arrivalTime: string, nextDepartureTime: string): strin
   }
 }
 
+// Calculate available seats for display (minimum across segments if available)
+function getDisplaySeats(flight: Flight): number {
+  const segments = flight.itineraries[0]?.segments || []
+
+  // Check if any segment has availableSeats defined
+  const segmentsWithSeats = segments.filter(s => s.availableSeats !== undefined)
+
+  if (segmentsWithSeats.length > 0) {
+    // Return minimum seats across all segments (bottleneck)
+    return Math.min(...segmentsWithSeats.map(s => s.availableSeats!))
+  }
+
+  // Fall back to flight-level seats
+  return flight.seats
+}
+
 export default function FlightCard({ flight, onBook, readOnly = false }: FlightCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -153,9 +169,12 @@ export default function FlightCard({ flight, onBook, readOnly = false }: FlightC
         {/* Seat Availability */}
         <div className="md:col-span-1 text-center">
           <div className="text-xs text-foreground/60 mb-1">Seats</div>
-          <div className={`font-bold text-lg ${flight.seats <= 5 ? "text-destructive" : "text-accent"}`}>
-            {flight.seats}
+          <div className={`font-bold text-lg ${getDisplaySeats(flight) <= 5 ? "text-destructive" : "text-accent"}`}>
+            {getDisplaySeats(flight)}
           </div>
+          {itinerary.numberOfStops > 0 && (
+            <div className="text-[10px] text-foreground/50 mt-1">min across legs</div>
+          )}
         </div>
 
         {/* Price & Book */}
@@ -184,7 +203,7 @@ export default function FlightCard({ flight, onBook, readOnly = false }: FlightC
               {itinerary.segments.map((segment, idx) => (
                 <div key={idx} className="mb-4 last:mb-0">
                   {/* Segment header */}
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 text-sm">
                       <span className="font-medium text-foreground">
                         {segment.airlineName} {segment.flightNumber}
@@ -193,6 +212,14 @@ export default function FlightCard({ flight, onBook, readOnly = false }: FlightC
                         <span className="text-foreground/60">({segment.aircraftCode})</span>
                       )}
                     </div>
+                    {segment.availableSeats !== undefined && (
+                      <div className="flex items-center gap-1 text-sm">
+                        <span className="text-foreground/60">Available seats:</span>
+                        <span className={`font-semibold ${segment.availableSeats <= 5 ? "text-destructive" : "text-accent"}`}>
+                          {segment.availableSeats}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Segment route */}
